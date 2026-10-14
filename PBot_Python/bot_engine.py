@@ -34,6 +34,9 @@ class BotEngine:
     self.last_lock_time = 0.0
     self.lock_aoe_mode = False
     self.lock_lifetap_remaining = 0
+    # Рдру не держит дистанцию шагами назад: повторно включает /follow focus.
+    self.last_druid_follow_time = 0.0
+    self.druid_follow_interval = 3.5
 
     # Диагностика датчиков: не чаще одного сообщения на канал каждые 2 секунды.
     self._last_druid_diag = 0.0
@@ -204,6 +207,7 @@ class BotEngine:
         try:
           self.heal_tick()
           self.lock_tick()
+          self.maintain_druid_follow()
         except Exception:
           # Не даём одной ошибке навсегда остановить цикл, оставляя HUD активным.
           logger.exception("Ошибка фонового цикла бота; повтор через 1 секунду")
@@ -213,6 +217,22 @@ class BotEngine:
             logger.debug("Не удалось обновить HUD после ошибки цикла", exc_info=True)
           time.sleep(1.0)
       time.sleep(BOT_TICK_INTERVAL)
+
+  def maintain_druid_follow(self):
+    """Периодически включает /follow focus; не отводит друида назад для удержания дистанции."""
+    hwnd = self.druid_win_id
+    if not hwnd or not is_window_valid(hwnd):
+      return
+
+    now = time.monotonic()
+    if now - self.last_druid_follow_time < self.druid_follow_interval:
+      return
+
+    self.last_druid_follow_time = now
+    logger.info(
+        "DRUID FOLLOW: send /follow focus via Numpad6; range-hold/backstep disabled"
+    )
+    control_send(hwnd, "{Numpad6}")
 
   def heal_tick(self):
     if self.druid_win_id == 0:
@@ -268,7 +288,10 @@ class BotEngine:
     elif near(G, 200):
       self.send_smart_key("{Numpad2}", "⚡ Сейв/Восст ➔ Party 3", 900)
     elif near(G, 210):
-      self.stop_movement(self.druid_win_id, "druid")
+      # Старый сигнал удержания дистанции больше не должен отталкивать друида назад.
+      logger.info("DRUID RANGE SIGNAL IGNORED: green=%s; backstep disabled", G)
+      self.ui_callback("druid", "Рендж-контроль отключён; следую за танком")
+      return
     elif near(G, 220):
       self.send_smart_key("{Numpad3}", "⚡ Сейв/Восст ➔ Party 4", 900)
     elif near(G, 230):
