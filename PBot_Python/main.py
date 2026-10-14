@@ -1,8 +1,10 @@
 import customtkinter as ctk
+import logging
 import keyboard
 from config import THEME
 from win_api import get_mouse_client_pos, make_window_noactivate
 from bot_engine import BotEngine
+from logging_setup import configure_logging
 
 
 class PBotHUD(ctk.CTk):
@@ -400,5 +402,10 @@ class PBotHUD(ctk.CTk):
 
 
 if __name__ == "__main__":
-    app = PBotHUD()
-    app.mainloop()
+    configure_logging()
+    try:
+        app = PBotHUD()
+        app.mainloop()
+    except Exception:
+        logging.getLogger(__name__).exception("PBot завершился из-за необработанной ошибки")
+        raise
