@@ -1,0 +1,22 @@
+name: Python syntax check
+
+on:
+  push:
+    paths:
+      - "PBot_Python/**/*.py"
+      - ".github/workflows/python-check.yml"
+  pull_request:
+    paths:
+      - "PBot_Python/**/*.py"
+      - ".github/workflows/python-check.yml"
+
+jobs:
+  compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python sources
+        run: python -m compileall -q PBot_Python
