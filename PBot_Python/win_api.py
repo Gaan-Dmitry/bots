@@ -1,9 +1,12 @@
 import ctypes
+import logging
 import time
 import win32api
 import win32con
 import win32gui
 from config import VK_MAP
+
+logger = logging.getLogger(__name__)
 
 user32 = ctypes.windll.user32
 gdi32 = ctypes.windll.gdi32
@@ -66,27 +69,39 @@ def get_background_pixel_color(hwnd: int, x: int, y: int):
 
 def control_send(hwnd: int, key_str: str):
   if not is_window_valid(hwnd):
+    logger.error("KEY SEND FAILED: invalid window hwnd=%s key=%s", hwnd, key_str)
     return
 
   vk = VK_MAP.get(key_str)
-  if not vk:
+  if vk is None:
+    logger.error("KEY SEND FAILED: key has no VK mapping: %s", key_str)
     return
 
   scan_code = user32.MapVirtualKeyW(vk, 0)
   lparam_down = (scan_code << 16) | 1
   lparam_up = (scan_code << 16) | 0xC0000001
 
-  win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, vk, lparam_down)
-  win32api.PostMessage(hwnd, win32con.WM_KEYUP, vk, lparam_up)
+  title = win32gui.GetWindowText(hwnd)
+  try:
+    win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, vk, lparam_down)
+    win32api.PostMessage(hwnd, win32con.WM_KEYUP, vk, lparam_up)
+  except Exception:
+    logger.exception("KEY SEND FAILED: PostMessage raised; hwnd=%s title=%r key=%s", hwnd, title, key_str)
+    raise
+
+  # Это подтверждает отправку Windows-сообщений, но не то, что игра их обработала.
+  logger.info("KEY SEND POSTED: hwnd=%s title=%r key=%s vk=%s; game acceptance unverified", hwnd, title, key_str, vk)
 
 
 def control_send_hold(hwnd: int, key_str: str, hold_sec: float = 0.06):
   """Зажимает клавишу на hold_sec секунд (нужно для гарантированной остановки бега)"""
   if not is_window_valid(hwnd):
+    logger.error("KEY HOLD FAILED: invalid window hwnd=%s key=%s", hwnd, key_str)
     return
 
   vk = VK_MAP.get(key_str)
-  if not vk:
+  if vk is None:
+    logger.error("KEY HOLD FAILED: key has no VK mapping: %s", key_str)
     return
 
   scan_code = user32.MapVirtualKeyW(vk, 0)
