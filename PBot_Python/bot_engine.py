@@ -1,8 +1,11 @@
+import logging
 import random
 import threading
 import time
 from config import BOT_TICK_INTERVAL, COLOR_TOLERANCE
 from win_api import control_send, control_send_hold, get_background_pixel_color, is_window_valid
+
+logger = logging.getLogger(__name__)
 
 
 def near(val: int, target: int) -> bool:
@@ -160,8 +163,17 @@ class BotEngine:
   def _loop(self):
     while True:
       if self.bot_running:
-        self.heal_tick()
-        self.lock_tick()
+        try:
+          self.heal_tick()
+          self.lock_tick()
+        except Exception:
+          # Не даём одной ошибке навсегда остановить цикл, оставляя HUD активным.
+          logger.exception("Ошибка фонового цикла бота; повтор через 1 секунду")
+          try:
+            self.ui_callback("druid", "ОШИБКА цикла — см. logs/pbot-runtime.log")
+          except Exception:
+            logger.debug("Не удалось обновить HUD после ошибки цикла", exc_info=True)
+          time.sleep(1.0)
       time.sleep(BOT_TICK_INTERVAL)
 
   def heal_tick(self):
