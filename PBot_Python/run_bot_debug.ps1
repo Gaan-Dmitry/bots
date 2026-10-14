@@ -10,7 +10,7 @@ if (-not (Test-Path $pythonExe)) {
     if ($pythonCommand) {
         $pythonExe = $pythonCommand.Source
     } else {
-        throw "Python не найден. Сначала запустите .\setup.ps1."
+        throw "Python was not found. Run .\setup.ps1 first."
     }
 }
 
@@ -19,10 +19,10 @@ New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $logFile = Join-Path $logDir "pbot-$stamp.log"
 
-Write-Host "PBot — диагностический запуск" -ForegroundColor Cyan
+Write-Host "PBot diagnostic launch" -ForegroundColor Cyan
 Write-Host "Python: $pythonExe"
-Write-Host "Лог:    $logFile"
-Write-Host "Закрытие окна завершит приложение. Текст ошибки сохранится в логе."
+Write-Host "Log:    $logFile"
+Write-Host "Closing this window will stop the application. Errors will be saved to the log."
 Write-Host ""
 
 "Started: $(Get-Date -Format o)" | Set-Content -Path $logFile -Encoding UTF8
@@ -32,7 +32,7 @@ Write-Host ""
 $exitCode = $LASTEXITCODE
 
 Write-Host ""
-Write-Host "PBot завершился с кодом: $exitCode"
-Write-Host "Лог сохранён: $logFile"
-Read-Host "Скопируйте ошибку из окна или приложите лог. Нажмите Enter для закрытия"
+Write-Host "PBot exited with code: $exitCode"
+Write-Host "Log saved to: $logFile"
+Read-Host "Copy the error text or attach the log, then press Enter to close"
 exit $exitCode
