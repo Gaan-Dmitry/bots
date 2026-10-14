@@ -1,17 +1,19 @@
-name: Python syntax check
+name: Python and PowerShell checks
 
 on:
   push:
     paths:
       - "PBot_Python/**/*.py"
+      - "PBot_Python/**/*.ps1"
       - ".github/workflows/python-check.yml"
   pull_request:
     paths:
       - "PBot_Python/**/*.py"
+      - "PBot_Python/**/*.ps1"
       - ".github/workflows/python-check.yml"
 
 jobs:
-  compile:
+  checks:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,3 +22,21 @@ jobs:
           python-version: "3.12"
       - name: Compile Python sources
         run: python -m compileall -q PBot_Python
+      - name: Parse PowerShell launchers
+        shell: powershell
+        run: |
+          $files = @(
+            "PBot_Python/setup.ps1",
+            "PBot_Python/run_bot_debug.ps1",
+            "PBot_Python/run_bot.ps1"
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            $path = Join-Path $PWD $file
+            [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              exit 1
+            }
+          }
