@@ -169,7 +169,10 @@ class BotEngine:
         except Exception:
           # Не даём одной ошибке навсегда остановить цикл, оставляя HUD активным.
           logger.exception("Ошибка фонового цикла бота; повтор через 1 секунду")
-          self.ui_callback("druid", "ОШИБКА цикла — см. logs/pbot-runtime.log")
+          try:
+            self.ui_callback("druid", "ОШИБКА цикла — см. logs/pbot-runtime.log")
+          except Exception:
+            logger.debug("Не удалось обновить HUD после ошибки цикла", exc_info=True)
           time.sleep(1.0)
       time.sleep(BOT_TICK_INTERVAL)
 
