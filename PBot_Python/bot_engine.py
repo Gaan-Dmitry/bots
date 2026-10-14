@@ -2,6 +2,7 @@ import logging
 import random
 import threading
 import time
+import win32gui
 from config import BOT_TICK_INTERVAL, COLOR_TOLERANCE
 from win_api import control_send, control_send_hold, get_background_pixel_color, is_window_valid
 
@@ -34,13 +35,44 @@ class BotEngine:
     self.lock_aoe_mode = False
     self.lock_lifetap_remaining = 0
 
+    # Диагностика датчиков: не чаще одного сообщения на канал каждые 2 секунды.
+    self._last_druid_diag = 0.0
+    self._last_lock_diag = 0.0
+
     self._thread = threading.Thread(target=self._loop, daemon=True)
     self._thread.start()
+
+  def _log_sensor_sample(self, channel: str, hwnd: int, x: int, y: int, color, force: bool = False):
+    now = time.monotonic()
+    attr = "_last_druid_diag" if channel == "DRUID" else "_last_lock_diag"
+    last = getattr(self, attr)
+    if not force and now - last < 2.0:
+      return
+    setattr(self, attr, now)
+
+    if not hwnd:
+      logger.warning("%s SENSOR: not bound; press the matching bind hotkey over the colored square", channel)
+      return
+
+    valid = is_window_valid(hwnd)
+    title = ""
+    rect = None
+    try:
+      title = win32gui.GetWindowText(hwnd)
+      rect = win32gui.GetWindowRect(hwnd) if valid else None
+    except Exception:
+      logger.exception("%s SENSOR: failed to query target window hwnd=%s", channel, hwnd)
+
+    logger.info(
+        "%s SENSOR: running=%s hwnd=%s valid=%s title=%r window_rect=%r point=(%s,%s) RGB=%r",
+        channel, self.bot_running, hwnd, valid, title, rect, x, y, color
+    )
 
   def send_smart_key(self, key: str, info: str, cooldown_ms: int = 650):
     now = time.time() * 1000
     if key == self.last_sent_key and (now - self.last_sent_time) < cooldown_ms:
       return False
+    logger.info("DRUID ACTION: key=%s reason=%s hwnd=%s", key, info, self.druid_win_id)
     control_send(self.druid_win_id, key)
     self.last_sent_key = key
     self.last_sent_time = now
@@ -51,6 +83,7 @@ class BotEngine:
     now = time.time() * 1000
     if key == self.last_lock_key and (now - self.last_lock_time) < cooldown_ms:
       return False
+    logger.info("WARLOCK ACTION: key=%s reason=%s hwnd=%s", key, info, self.lock_win_id)
     control_send(self.lock_win_id, key)
     self.last_lock_key = key
     self.last_lock_time = now
@@ -106,18 +139,22 @@ class BotEngine:
     self.druid_win_id = hwnd
     self.client_x = x
     self.client_y = y
-    self.ui_callback("druid", f"Привязан [ID:{hwnd} | {x},{y}]")
     color = get_background_pixel_color(hwnd, x, y)
-    if color:
+    logger.info("DRUID BIND: hwnd=%s point=(%s,%s)", hwnd, x, y)
+    self._log_sensor_sample("DRUID", hwnd, x, y, color, force=True)
+    self.ui_callback("druid", f"Привязан [ID:{hwnd} | {x},{y}]")
+    if color is not None:
       self.ui_callback("druid_color", color)
 
   def bind_lock(self, hwnd: int, x: int, y: int):
     self.lock_win_id = hwnd
     self.lock_x = x
     self.lock_y = y
-    self.ui_callback("lock", f"Привязан [ID:{hwnd} | {x},{y}]")
     color = get_background_pixel_color(hwnd, x, y)
-    if color:
+    logger.info("WARLOCK BIND: hwnd=%s point=(%s,%s)", hwnd, x, y)
+    self._log_sensor_sample("WARLOCK", hwnd, x, y, color, force=True)
+    self.ui_callback("lock", f"Привязан [ID:{hwnd} | {x},{y}]")
+    if color is not None:
       self.ui_callback("lock_color", color)
 
   def toggle_bot(self):
@@ -126,6 +163,7 @@ class BotEngine:
       return
 
     self.bot_running = not self.bot_running
+    logger.info("BOT STATE: running=%s druid_hwnd=%s lock_hwnd=%s", self.bot_running, self.druid_win_id, self.lock_win_id)
     self.ui_callback("state", self.bot_running)
 
   def toggle_aoe_mode(self):
@@ -177,13 +215,18 @@ class BotEngine:
       time.sleep(BOT_TICK_INTERVAL)
 
   def heal_tick(self):
-    if self.druid_win_id == 0 or not is_window_valid(self.druid_win_id):
+    if self.druid_win_id == 0:
+      self._log_sensor_sample("DRUID", 0, self.client_x, self.client_y, "NOT_BOUND")
+      return
+    if not is_window_valid(self.druid_win_id):
+      self._log_sensor_sample("DRUID", self.druid_win_id, self.client_x, self.client_y, "INVALID_WINDOW")
       return
 
     color = get_background_pixel_color(
         self.druid_win_id, self.client_x, self.client_y
     )
-    if not color:
+    self._log_sensor_sample("DRUID", self.druid_win_id, self.client_x, self.client_y, color)
+    if color is None:
       return
 
     self.ui_callback("druid_color", color)
@@ -240,13 +283,18 @@ class BotEngine:
       self.send_smart_key("{Numpad7}", "🐆 Походный облик + /follow", 1000)
 
   def lock_tick(self):
-    if self.lock_win_id == 0 or not is_window_valid(self.lock_win_id):
+    if self.lock_win_id == 0:
+      self._log_sensor_sample("WARLOCK", 0, self.lock_x, self.lock_y, "NOT_BOUND")
+      return
+    if not is_window_valid(self.lock_win_id):
+      self._log_sensor_sample("WARLOCK", self.lock_win_id, self.lock_x, self.lock_y, "INVALID_WINDOW")
       return
 
     color = get_background_pixel_color(
         self.lock_win_id, self.lock_x, self.lock_y
     )
-    if not color:
+    self._log_sensor_sample("WARLOCK", self.lock_win_id, self.lock_x, self.lock_y, color)
+    if color is None:
       return
 
     self.ui_callback("lock_color", color)
