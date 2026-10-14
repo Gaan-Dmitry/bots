@@ -1,0 +1,7 @@
+## Interface: 30300
+## Title: |cffcba6f7LuraBot|r v1.0 (Demonology Warlock)
+## Notes: Боевой бот Демон-Лока с привязкой к танку и авто-бытом
+## Author: Dmitry
+## Version: 1.0
+
+LuraBot.lua

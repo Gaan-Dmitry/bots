@@ -1,0 +1,4 @@
+## Interface: 30300
+## Title: PatriarchBot
+## Notes: Пиксельный маячок для рдру Патриархат (танк Empress)
+PatriarchBot.lua
