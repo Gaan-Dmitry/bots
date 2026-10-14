@@ -182,7 +182,7 @@ class PBotHUD(ctk.CTk):
 
         self.druid_lbl = ctk.CTkLabel(
             druid_info_box,
-            text="Наведи на WA и жми F3",
+            text="Наведи на цветной квадрат в WoW и жми F3",
             font=("Segoe UI", 12, "bold"),
             text_color=THEME["text"],
             anchor="w"
@@ -236,7 +236,7 @@ class PBotHUD(ctk.CTk):
 
         self.lock_lbl = ctk.CTkLabel(
             lock_info_box,
-            text="Наведи на WA и жми Shift+F3",
+            text="Наведи на цветной квадрат в WoW и жми Shift+F3",
             font=("Segoe UI", 12, "bold"),
             text_color=THEME["text"],
             anchor="w"
